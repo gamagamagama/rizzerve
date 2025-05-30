@@ -8,6 +8,7 @@ import { Contract } from "ethers";
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
+
 const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
@@ -26,7 +27,7 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   await deploy("YourContract", {
     from: deployer,
     // Contract constructor arguments
-    args: [deployer, owner],
+    args: [owner],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -43,3 +44,30 @@ export default deployYourContract;
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
 deployYourContract.tags = ["YourContract"];
+
+async function deployFakeAsset(hre: HardhatRuntimeEnvironment) {
+  const { deployer } = await hre.getNamedAccounts();
+const fakeAsset = await deploy("Rizz", { from: deployer, log: true, autoMine: true }, hre);
+return fakeAsset;
+async function deploy(
+  contractName: string,
+  options: { from: string; log: boolean; autoMine: boolean },
+  hre: HardhatRuntimeEnvironment
+): Promise<Contract> {
+  const { deployments, ethers } = hre;
+  const { deploy } = deployments;
+
+  const deploymentResult = await deploy(contractName, {
+    from: options.from,
+    log: options.log,
+    autoMine: options.autoMine,
+  });
+
+  if (options.log) {
+    console.log(`📄 ${contractName} deployed at ${deploymentResult.address}`);
+  }
+
+  return ethers.getContractAt(contractName, deploymentResult.address);
+}
+
+}
