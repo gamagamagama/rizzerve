@@ -4,68 +4,33 @@ import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import { ethers as utils } from "ethers";
 
-const deployRizzTokenAndStakingVault: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
-  const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
 
-  const owner = await ethers.getSigner(deployer);
+module.exports = async ({ getNamedAccounts, deployments }) => {
+  const { deploy } = deployments;
+  const { deployer } = await getNamedAccounts();
 
-  const initialSupply = utils.parseEther("1000000");
+  console.log("Deploying RizzToken with deployer:", deployer);
 
-  const RizzToken = await ethers.getContractFactory("RizzToken");
   const rizzToken = await deploy("RizzToken", {
     from: deployer,
-    args: [initialSupply],
+    args: [deployer], // Pass the deployer as the initial owner
     log: true,
-    autoMine: true,
+    waitConfirmations: 1,
   });
 
-  const rizzTokenContract = await ethers.getContractAt("RizzToken", rizzToken.address);
-  await rizzTokenContract.mint(deployer, utils.parseEther("1000"));
   console.log("RizzToken deployed to:", rizzToken.address);
+  console.log("Initial owner and minter:", deployer);
 
-  const StakingVault = await ethers.getContractFactory("StakingVault");
-  const stakingVault = await deploy("StakingVault", {
-    from: deployer,
-    args: [rizzToken.address],
-    log: true,
-    autoMine: true,
-  });
+  // Verify deployment
+  const RizzTokenContract = await ethers.getContractAt("RizzToken", rizzToken.address);
+  const name = await RizzTokenContract.name();
+  const symbol = await RizzTokenContract.symbol();
+  const owner = await RizzTokenContract.owner();
 
-  const stakingVaultContract = await ethers.getContractAt("StakingVault", stakingVault.address);
-  await rizzTokenContract.approve(stakingVault.address, utils.parseEther("1000000"));
-  console.log("StakingVault deployed to:", stakingVault.address);
+  console.log(`Token Name: ${name}`);
+  console.log(`Token Symbol: ${symbol}`);
+  console.log(`Contract Owner: ${owner}`);
+  console.log(`Is owner a minter: ${await RizzTokenContract.isMinter(owner)}`);
 };
 
-export default deployRizzTokenAndStakingVault;
-
-deployRizzTokenAndStakingVault.tags = ["RizzToken", "StakingVault"];
-
-async function deploy(
-  contractName: string,
-  options: { from: string; log: boolean; autoMine: boolean },
-  hre: HardhatRuntimeEnvironment
-): Promise<Contract> {
-  const { deployments, ethers } = hre;
-  const { deploy } = deployments;
-
-  const deploymentResult = await deploy(contractName, {
-    from: options.from,
-    log: options.log,
-    autoMine: options.autoMine,
-  });
-
-  if (options.log) {
-    console.log(`📄 ${contractName} deployed at ${deploymentResult.address}`);
-  }
-
-  return ethers.getContractAt(contractName, deploymentResult.address);
-}
-
-async function deployFakeAsset(hre: HardhatRuntimeEnvironment) {
-  const { deployer } = await hre.getNamedAccounts();
-  const fakeAsset = await deploy("Rizz", { from: deployer, log: true, autoMine: true }, hre);
-  return fakeAsset;
-}
-
-deployFakeAsset.tags = ["FakeAsset"];
+module.exports.tags = ["RizzToken"];
