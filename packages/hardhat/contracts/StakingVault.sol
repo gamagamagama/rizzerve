@@ -12,6 +12,14 @@ contract StakingVault {
     }
 
     mapping(address => Stake) public stakes;
-    
+    constructor (RizzToken _token){
+        token = _token;
+    }
+
+    //TODO:
+    //staking function period, amount, locking/unlocking
+    //withdraw function with simulated reward
+        //simulation of 10% yield
+    //function getStake
 
 }
