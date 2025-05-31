@@ -1,25 +1,26 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { Contract } from "ethers";
 import { ethers } from "hardhat";
-import { ethers as utils } from "ethers";
 
-
-module.exports = async ({ getNamedAccounts, deployments }) => {
-  const { deploy } = deployments;
+const deployRizzToken: DeployFunction = async ({ getNamedAccounts, deployments }) => {
+  const { deploy, get } = deployments;
   const { deployer } = await getNamedAccounts();
 
   console.log("Deploying RizzToken with deployer:", deployer);
 
+  // Get the previously deployed oracle
+  const mockPriceOracle = await get("MockPriceOracle");
+
   const rizzToken = await deploy("RizzToken", {
     from: deployer,
-    args: [deployer], // Pass the deployer as the initial owner
+    args: [deployer, mockPriceOracle.address], // Pass deployer and oracle address
     log: true,
     waitConfirmations: 1,
   });
 
   console.log("RizzToken deployed to:", rizzToken.address);
   console.log("Initial owner and minter:", deployer);
+  console.log("Oracle address:", mockPriceOracle.address);
 
   // Verify deployment
   const RizzTokenContract = await ethers.getContractAt("RizzToken", rizzToken.address);
@@ -33,4 +34,6 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   console.log(`Is owner a minter: ${await RizzTokenContract.isMinter(owner)}`);
 };
 
-module.exports.tags = ["RizzToken"];
+export default deployRizzToken;
+deployRizzToken.tags = ["RizzToken"];
+deployRizzToken.dependencies = ["MockPriceOracle"]; // Ensures oracle is deployed first

@@ -121,8 +121,7 @@ const TokenMinter = () => {
   const initializeWeb3 = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
-        // Create Web3 instance
-        const web3Instance = new window.Web3(window.ethereum);
+        const web3Instance = new window.ethereum(window.ethereum);
         setWeb3(web3Instance);
         
         // Check if already connected
@@ -133,7 +132,7 @@ const TokenMinter = () => {
           const contractInstance = new web3Instance.eth.Contract(contractABI, CONTRACT_ADDRESS);
           setContract(contractInstance);
         }
-      } catch (err) {
+      } catch (err : Error) {
         setError('Failed to initialize Web3: ' + err.message);
       }
     } else {
@@ -453,3 +452,5 @@ const TokenMinter = () => {
 };
 
 export default TokenMinter;
+
+ 
