@@ -1,54 +1,46 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
+import { ethers } from "hardhat";
+import { ethers as utils } from "ethers";
 
-/**
- * Deploys a contract named "YourContract" using the deployer account and
- * constructor arguments set to the deployer address
- *
- * @param hre HardhatRuntimeEnvironment object.
- */
-
-const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  /*
-    On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
-
-    When deploying to live networks (e.g `yarn deploy --network sepolia`), the deployer account
-    should have sufficient balance to pay for the gas fees for contract creation.
-
-    You can generate a random account with `yarn generate` or `yarn account:import` to import your
-    existing PK which will fill DEPLOYER_PRIVATE_KEY_ENCRYPTED in the .env file (then used on hardhat.config.ts)
-    You can run the `yarn account` command to check your balance in every network.
-  */
+const deployRizzTokenAndStakingVault: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  const owner = "0x31c5cB17510CB0bc87c420711aAcecABc5b36929"; 
-  await deploy("YourContract", {
+  const owner = await ethers.getSigner(deployer);
+
+  const initialSupply = utils.parseEther("1000000");
+
+  const RizzToken = await ethers.getContractFactory("RizzToken");
+  const rizzToken = await deploy("RizzToken", {
     from: deployer,
-    // Contract constructor arguments
-    args: [owner],
+    args: [initialSupply],
     log: true,
-    // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
-    // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
 
-  // Get the deployed contract to interact with it after deploying.
-  const yourContract = await hre.ethers.getContract<Contract>("YourContract", deployer);
-  console.log("👋 Initial greeting:", await yourContract.greeting());
+  const rizzTokenContract = await ethers.getContractAt("RizzToken", rizzToken.address);
+  await rizzTokenContract.mint(deployer, utils.parseEther("1000"));
+  console.log("RizzToken deployed to:", rizzToken.address);
+
+  const StakingVault = await ethers.getContractFactory("StakingVault");
+  const stakingVault = await deploy("StakingVault", {
+    from: deployer,
+    args: [rizzToken.address],
+    log: true,
+    autoMine: true,
+  });
+
+  const stakingVaultContract = await ethers.getContractAt("StakingVault", stakingVault.address);
+  await rizzTokenContract.approve(stakingVault.address, utils.parseEther("1000000"));
+  console.log("StakingVault deployed to:", stakingVault.address);
 };
 
-export default deployYourContract;
+export default deployRizzTokenAndStakingVault;
 
-// Tags are useful if you have multiple deploy files and only want to run one of them.
-// e.g. yarn deploy --tags YourContract
-deployYourContract.tags = ["YourContract"];
+deployRizzTokenAndStakingVault.tags = ["RizzToken", "StakingVault"];
 
-async function deployFakeAsset(hre: HardhatRuntimeEnvironment) {
-  const { deployer } = await hre.getNamedAccounts();
-const fakeAsset = await deploy("Rizz", { from: deployer, log: true, autoMine: true }, hre);
-return fakeAsset;
 async function deploy(
   contractName: string,
   options: { from: string; log: boolean; autoMine: boolean },
@@ -70,4 +62,10 @@ async function deploy(
   return ethers.getContractAt(contractName, deploymentResult.address);
 }
 
+async function deployFakeAsset(hre: HardhatRuntimeEnvironment) {
+  const { deployer } = await hre.getNamedAccounts();
+  const fakeAsset = await deploy("Rizz", { from: deployer, log: true, autoMine: true }, hre);
+  return fakeAsset;
 }
+
+deployFakeAsset.tags = ["FakeAsset"];

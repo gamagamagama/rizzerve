@@ -50,8 +50,11 @@
     "verify": "yarn hardhat:verify"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.21",
     "husky": "~9.1.6",
-    "lint-staged": "~13.2.2"
+    "lint-staged": "~13.2.2",
+    "postcss": "^8.5.4",
+    "tailwindcss": "^4.1.8"
   },
   "packageManager": "yarn@3.2.3",
   "engines": {

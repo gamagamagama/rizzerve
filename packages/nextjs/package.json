@@ -15,7 +15,6 @@
     "vercel:login": "vercel login",
     "vercel:yolo": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env NEXT_PUBLIC_IGNORE_BUILD_ERROR=true --build-env VERCEL_TELEMETRY_DISABLED=1",
     "tailwind:init": "tailwindcss init -p"
-
   },
   "dependencies": {
     "@heroicons/react": "~2.1.5",
@@ -26,7 +25,9 @@
     "blo": "~1.2.0",
     "burner-connector": "0.0.14",
     "daisyui": "5.0.9",
+    "ethers": "^6.14.3",
     "kubo-rpc-client": "~5.0.2",
+    "lucide-react": "^0.511.0",
     "next": "~15.2.3",
     "next-nprogress-bar": "~2.3.13",
     "next-themes": "~0.3.0",
