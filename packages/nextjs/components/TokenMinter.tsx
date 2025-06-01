@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Web3 from 'web3';
 import { 
   Wallet, 
   Coins, 
@@ -14,8 +15,8 @@ import {
 
 const TokenMinter = () => {
   const [account, setAccount] = useState('');
-  const [web3, setWeb3] = useState(null);
-  const [contract, setContract] = useState(null);
+  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [contract, setContract] = useState<InstanceType<Web3["eth"]["Contract"]> | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -105,8 +106,8 @@ const TokenMinter = () => {
     }
   ];
 
-  // Replace with your actual contract address
-  const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  // Replace with actual contract address
+  const CONTRACT_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
   useEffect(() => {
     initializeWeb3();
@@ -121,7 +122,7 @@ const TokenMinter = () => {
   const initializeWeb3 = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
-        const web3Instance = new window.ethereum(window.ethereum);
+        const web3Instance = new Web3(window.ethereum);
         setWeb3(web3Instance);
         
         // Check if already connected
@@ -132,7 +133,7 @@ const TokenMinter = () => {
           const contractInstance = new web3Instance.eth.Contract(contractABI, CONTRACT_ADDRESS);
           setContract(contractInstance);
         }
-      } catch (err : Error) {
+      } catch (err : any) {
         setError('Failed to initialize Web3: ' + err.message);
       }
     } else {
@@ -141,14 +142,18 @@ const TokenMinter = () => {
   };
 
   const connectWallet = async () => {
-    if (!web3) return;
-    
+    if (!web3) {
+      setError('Web3 not initialized');
+      return;
+    }
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
+      setStatus('Connecting wallet...');
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       
       const accounts = await web3.eth.getAccounts();
-      const address = accounts[0];
+      const address: string = accounts[0];
       setAccount(address);
       
       const contractInstance = new web3.eth.Contract(contractABI, CONTRACT_ADDRESS);
@@ -156,8 +161,8 @@ const TokenMinter = () => {
       
       setStatus('Wallet connected successfully!');
       setError('');
-    } catch (err) {
-      setError('Failed to connect wallet: ' + err.message);
+    } catch (err : any) {
+      setError('Failed to connect wallet: ' + (err?.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -176,31 +181,158 @@ const TokenMinter = () => {
     if (!contract) return;
     
     try {
-      const [name, symbol, supply] = await Promise.all([
+      // Get basic token info
+      const [name, symbol, totalSupply] = await Promise.all([
         contract.methods.name().call(),
         contract.methods.symbol().call(),
-        contract.methods.totalSupply().call()
+        contract.methods.totalSupply().call(),
       ]);
-      
-      setTokenName(name);
-      setTokenSymbol(symbol);
-      setTotalSupply(weiToEther(supply));
-      
-      if (account) {
-        const [balance, owner, minterStatus] = await Promise.all([
-          contract.methods.balanceOf(account).call(),
-          contract.methods.owner().call(),
-          contract.methods.isMinter ? contract.methods.isMinter(account).call() : Promise.resolve(false)
-        ]);
-        
-        setUserBalance(weiToEther(balance));
-        setIsOwner(owner.toLowerCase() === account.toLowerCase());
-        setIsMinter(minterStatus);
+  
+      console.log('Token name:', name);
+      console.log('Token symbol:', symbol);
+      console.log('Total supply from contract:', totalSupply);
+  
+      if (typeof name === 'string') {
+        setTokenName(name);
       }
-    } catch (err) {
+      
+      if (typeof symbol === 'string') {
+        setTokenSymbol(symbol);
+      }
+  
+      // Get contract owner address
+      const owner: string = await contract.methods.owner().call();
+      console.log('Contract owner address:', owner);
+  
+      if (account) {
+        console.log('Connected wallet address:', account);
+        
+        // Get balances for both owner and connected user
+        const [ownerBalance, userBalance] = await Promise.all([
+          contract.methods.balanceOf(owner).call(),           // Owner's token balance
+          contract.methods.balanceOf(account).call(),         // Connected wallet's balance
+        ]);
+  
+        console.log('Raw owner balance:', ownerBalance);
+        console.log('Raw user balance:', userBalance);
+  
+        // Convert to readable format
+        const ownerBalanceEther = weiToEther(ownerBalance);
+        const userBalanceEther = weiToEther(userBalance);
+  
+        console.log('Owner balance (converted):', ownerBalanceEther);
+        console.log('User balance (converted):', userBalanceEther);
+  
+        // Set the state values
+        setTotalSupply(ownerBalanceEther);  // Show owner's balance as "Total Supply"
+        setUserBalance(userBalanceEther);   // Show connected wallet's balance
+  
+        // Check if connected account is the owner
+        const isOwnerAccount = typeof owner === 'string' && typeof account === 'string' && owner.toLowerCase() === account.toLowerCase();
+        setIsOwner(isOwnerAccount);
+        
+        console.log('Is connected account the owner?', isOwnerAccount);
+  
+        // Check minter status if method exists
+        try {
+          if (contract.methods.isMinter) {
+            const minterStatus = await contract.methods.isMinter(account).call();
+            setIsMinter(!!minterStatus);
+          } else {
+            setIsMinter(false);
+          }
+        } catch {
+          setIsMinter(false);
+        }
+  
+        // Additional info for debugging
+        console.log('=== SUMMARY ===');
+        console.log('Actual total supply:', weiToEther(totalSupply));
+        console.log('Owner balance (shown as "Total Supply"):', ownerBalanceEther);
+        console.log('User balance (your balance):', userBalanceEther);
+        console.log('Owner has all tokens?', ownerBalanceEther === weiToEther(totalSupply));
+        
+      } else {
+        // If no account connected, just show the actual total supply
+        setTotalSupply(weiToEther(totalSupply ? totalSupply.toString() : '0'));
+        setUserBalance('0');
+      }
+  
+    } catch (err : any) {
+      console.error('Token info error:', err);
       setError('Failed to load token info: ' + err.message);
     }
   };
+  
+  // const handleMint = async (recipient, amount) => {
+  //   if (!contract || !account) return;
+  
+  //   try {
+  //     // Get owner address and balance
+  //     const owner = await contract.methods.owner().call();
+  //     const ownerBalance = await contract.methods.balanceOf(owner).call();
+  //     const ownerBalanceEther = parseFloat(weiToEther(ownerBalance));
+  //     const mintAmount = parseFloat(amount);
+  
+  //     // Check if owner has enough balance
+  //     if (mintAmount > ownerBalanceEther) {
+  //       setError(`Not enough tokens! Owner has ${ownerBalanceEther}, you requested ${mintAmount}`);
+  //       return;
+  //     }
+  
+  //     // Proceed with mint
+  //     const amountInWei = etherToWei(amount);
+  //     await contract.methods.mint(recipient, amountInWei).send({ from: account });
+      
+  //     // Reload balances
+  //     loadTokenInfo();
+      
+  //   } catch (err : any) {
+  //     setError('Mint failed: ' + err.message);
+  //   }
+  // };
+  // Alternative version with clearer variable names
+  // const loadTokenInfoClear = async () => {
+  //   if (!contract || !account) return;
+    
+  //   try {
+  //     // Get basic token info
+  //     const [name, symbol] = await Promise.all([
+  //       contract.methods.name().call(),
+  //       contract.methods.symbol().call(),
+  //     ]);
+  
+  //     setTokenName(name);
+  //     setTokenSymbol(symbol);
+  
+  //     // Get the contract owner
+  //     const contractOwner = await contract.methods.owner().call();
+      
+  //     // Get balances
+  //     const ownerTokens = await contract.methods.balanceOf(contractOwner).call();
+  //     const yourTokens = await contract.methods.balanceOf(account).call();
+  
+  //     // Display owner's tokens as "Total Supply" and user's tokens as "Your Balance"
+  //     setTotalSupply(weiToEther(ownerTokens));  // Contract owner's balance
+  //     setUserBalance(weiToEther(yourTokens));   // Your actual balance
+  
+  //     // Set owner status
+  //     if (typeof contractOwner === 'string' && typeof account === 'string') {
+  //       setIsOwner((contractOwner as string).toLowerCase() === (account as string).toLowerCase());
+  //     } else {
+  //       setIsOwner(false);
+  //     }
+  
+  //     console.log('Contract Owner:', contractOwner);
+  //     console.log('Your Address:', account);
+  //     console.log('Owner\'s Tokens (displayed as Total Supply):', weiToEther(ownerTokens));
+  //     console.log('Your Tokens:', weiToEther(yourTokens));
+  
+  //   } catch (err : any) {
+  //     console.error('Error:', err);
+  //     setError('Failed to load token info: ' + err.message);
+  //   }
+  // };
 
   const mintTokens = async () => {
     if (!contract || !mintTo || !mintAmount || !account) return;
@@ -209,6 +341,17 @@ const TokenMinter = () => {
       setLoading(true);
       setError('');
       setStatus('Minting tokens...');
+      
+      // Check owner balance before minting
+      const owner = await contract.methods.owner().call();
+      const ownerBalance = await contract.methods.balanceOf(owner).call();
+      const ownerBalanceEther = parseFloat(weiToEther(ownerBalance));
+      const requestedAmount = parseFloat(mintAmount);
+      
+      if (requestedAmount > ownerBalanceEther) {
+        setError(`Not enough tokens! Owner has ${ownerBalanceEther}, you requested ${requestedAmount}`);
+        return;
+      }
       
       const amount = etherToWei(mintAmount);
       
@@ -220,7 +363,7 @@ const TokenMinter = () => {
       // Send transaction
       const result = await contract.methods.mint(mintTo, amount).send({
         from: account,
-        gas: Math.floor(gasEstimate * 1.2) // Add 20% buffer
+        gas: Math.floor(Number(gasEstimate) * 1.2).toString() // Add 20% buffer
       });
       
       setStatus(`Successfully minted ${mintAmount} ${tokenSymbol} tokens to ${mintTo}`);
@@ -231,7 +374,7 @@ const TokenMinter = () => {
       // Clear form
       setMintTo('');
       setMintAmount('');
-    } catch (err) {
+    } catch (err : any) {
       setError('Failed to mint tokens: ' + err.message);
       setStatus('');
     } finally {
@@ -245,16 +388,16 @@ const TokenMinter = () => {
   };
 
   // Add Web3 script to head if not present
-  useEffect(() => {
-    if (typeof window.Web3 === 'undefined') {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.0/web3.min.js';
-      script.onload = () => {
-        initializeWeb3();
-      };
-      document.head.appendChild(script);
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (typeof Web3 === 'undefined') {
+  //     const script = document.createElement('script');
+  //     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.0/web3.min.js';
+  //     script.onload = () => {
+  //       initializeWeb3();
+  //     };
+  //     document.head.appendChild(script);
+  //   }
+  // }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
