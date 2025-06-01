@@ -348,7 +348,7 @@ const TokenMinter = () => {
       const ownerBalanceEther = parseFloat(weiToEther(ownerBalance));
       const requestedAmount = parseFloat(mintAmount);
       
-      if (requestedAmount > ownerBalanceEther) {
+      if (requestedAmount > ownerBalanceEther && !isOwner) {
         setError(`Not enough tokens! Owner has ${ownerBalanceEther}, you requested ${requestedAmount}`);
         return;
       }
